@@ -1,7 +1,6 @@
 package de.niclashoyer.resteasytest;
 
 import de.niclashoyer.resteasytest.netty.webid.WebIDNettyJaxrsServer;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.KeyStore;
@@ -12,7 +11,6 @@ import java.security.cert.CertificateException;
 import java.util.Collections;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
