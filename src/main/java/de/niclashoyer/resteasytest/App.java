@@ -1,40 +1,69 @@
 package de.niclashoyer.resteasytest;
 
+import de.niclashoyer.resteasytest.netty.webid.WebIDNettyJaxrsServer;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 import java.util.Collections;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.jboss.resteasy.plugins.server.netty.NettyJaxrsServer;
+import org.jboss.resteasy.spi.HttpRequest;
 import org.jboss.resteasy.spi.ResteasyDeployment;
 
 @Path("/")
-public class App 
-{
-    public static void main( String[] args ) throws NoSuchAlgorithmException
-    {
+public class App {
+
+    public static void main(String[] args) throws Exception {
         ResteasyDeployment deployment = new ResteasyDeployment();
         deployment.setResourceClasses(Collections.singletonList(App.class.getName()));
-        final NettyJaxrsServer server = new NettyJaxrsServer();
+        final WebIDNettyJaxrsServer server = new WebIDNettyJaxrsServer();
         server.setDeployment(deployment);
-        
-        //SSLContext ssl = SSLContext.getInstance("TLS");
-        //ssl.init(kms, tms, null);
-        
+
+        server.setKeyManagers(App.getKeyManager());
+
         int port = 3000;
         server.setPort(port);
         server.start();
-        System.out.println("Server listening on port "+port);
+        System.out.println("Server listening on port " + port);
+
     }
-    
+
+    protected static KeyManager[] getKeyManager() throws NoSuchAlgorithmException, FileNotFoundException, KeyStoreException, IOException, UnrecoverableKeyException, CertificateException {
+        TrustManagerFactory tmFactory = TrustManagerFactory.getInstance("PKIX");
+        KeyStore tmpKS = null;
+        tmFactory.init(tmpKS);
+        KeyStore ks = KeyStore.getInstance("JKS");
+        ks.load(App.class.getClassLoader().getResourceAsStream("cert.jks"),"secret".toCharArray());
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+        kmf.init(ks,"secret".toCharArray());
+        return kmf.getKeyManagers();
+    }
+
     @GET
-    public Response get() {
-        return Response.status(200).entity("Hello World!").build();
+    public Response get(@Context HttpRequest req) {
+        String str = "Hello World!\n";
+        Object claims = req.getAttribute("webidclaims");
+        if (claims != null) {
+            str += "You claimed the WebIDs "+claims.toString();
+        }
+        return Response.status(200).entity(str).type(MediaType.TEXT_PLAIN).build();
     }
-    
+
     @GET
     @Path("{any}")
-    public Response catchAll() {
-        return this.get();
+    public Response catchAll(@Context HttpRequest req) {
+        return this.get(req);
     }
 }
