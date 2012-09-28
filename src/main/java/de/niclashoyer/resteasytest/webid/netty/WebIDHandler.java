@@ -1,4 +1,4 @@
-package de.niclashoyer.resteasytest.netty.webid;
+package de.niclashoyer.resteasytest.webid.netty;
 
 import java.security.cert.Certificate;
 import java.security.cert.CertificateParsingException;

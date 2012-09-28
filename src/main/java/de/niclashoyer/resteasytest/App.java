@@ -1,6 +1,6 @@
 package de.niclashoyer.resteasytest;
 
-import de.niclashoyer.resteasytest.netty.webid.WebIDNettyJaxrsServer;
+import de.niclashoyer.resteasytest.webid.netty.WebIDNettyJaxrsServer;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.KeyStore;

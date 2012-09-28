@@ -1,5 +1,5 @@
 
-package de.niclashoyer.resteasytest.netty.webid;
+package de.niclashoyer.resteasytest.webid.netty;
 
 import javax.net.ssl.SSLContext;
 import org.jboss.netty.channel.ChannelHandler;
