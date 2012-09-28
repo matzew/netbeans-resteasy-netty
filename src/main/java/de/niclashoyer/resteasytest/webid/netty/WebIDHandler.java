@@ -4,6 +4,7 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import javax.net.ssl.SSLEngine;
@@ -17,24 +18,32 @@ import org.jboss.netty.handler.ssl.SslHandler;
 import org.jboss.resteasy.spi.HttpRequest;
 
 public class WebIDHandler implements ChannelUpstreamHandler {
-    
-    protected X509Certificate getPeerCertificate(SslHandler handler) throws SSLPeerUnverifiedException {
+
+    protected X509Certificate getPeerCertificate(SslHandler handler) {
         SSLEngine engine = handler.getEngine();
         SSLSession session = engine.getSession();
-        Certificate[] certs = session.getPeerCertificates();
-        if (certs.length > 0) {
-            Certificate cert = certs[0];
-            if (cert instanceof X509Certificate) {
-                return (X509Certificate) cert;
+        Certificate[] certs;
+        try {
+            certs = session.getPeerCertificates();
+            if (certs.length > 0) {
+                Certificate cert = certs[0];
+                if (cert instanceof X509Certificate) {
+                    return (X509Certificate) cert;
+                } else {
+                    return null;
+                }
             } else {
                 return null;
             }
-        } else {
+        } catch (SSLPeerUnverifiedException ex) {
             return null;
         }
     }
 
     protected Collection<String> getClaimedURIs(X509Certificate cert) throws CertificateParsingException {
+        if (cert == null) {
+            return Collections.EMPTY_LIST;
+        }
         Collection<String> uris;
         int type;
         String uri;
@@ -65,8 +74,10 @@ public class WebIDHandler implements ChannelUpstreamHandler {
                 throw new IllegalStateException("WebIDHandler needs an SslHandler attached");
             }
             X509Certificate cert = getPeerCertificate(ssl);
-            Collection<String> uris = getClaimedURIs(cert);
-            req.setAttribute("webidclaims", uris);
+            if (cert != null) {
+                Collection<String> uris = getClaimedURIs(cert);
+                req.setAttribute("webidclaims", uris);
+            }
         }
         ctx.sendUpstream(evt);
     }

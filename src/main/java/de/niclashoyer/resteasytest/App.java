@@ -1,5 +1,6 @@
 package de.niclashoyer.resteasytest;
 
+import de.niclashoyer.resteasytest.webid.WebIDInterceptor;
 import de.niclashoyer.resteasytest.webid.netty.WebIDNettyJaxrsServer;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -26,6 +27,7 @@ public class App {
     public static void main(String[] args) throws Exception {
         ResteasyDeployment deployment = new ResteasyDeployment();
         deployment.setResourceClasses(Collections.singletonList(App.class.getName()));
+        deployment.setProviderClasses(Collections.singletonList(WebIDInterceptor.class.getName()));
         final WebIDNettyJaxrsServer server = new WebIDNettyJaxrsServer();
         server.setDeployment(deployment);
 
