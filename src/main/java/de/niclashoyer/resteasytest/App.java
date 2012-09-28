@@ -9,7 +9,9 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
@@ -56,7 +58,13 @@ public class App {
         String str = "Hello World!\n";
         Object claims = req.getAttribute("webidclaims");
         if (claims != null) {
-            str += "You claimed the WebIDs "+claims.toString();
+            Collection<String> uris = (Collection<String>) claims;
+            str += "You claimed the following WebIDs:\n";
+            int i = 1;
+            for (String uri : uris) {
+                str += i+". "+uri+"\n";
+                i++;
+            }
         }
         return Response.status(200).entity(str).type(MediaType.TEXT_PLAIN).build();
     }
