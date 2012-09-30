@@ -1,5 +1,7 @@
 package de.niclashoyer.resteasytest;
 
+import de.niclashoyer.resteasytest.resource.H2RepresentationFactory;
+import de.niclashoyer.resteasytest.resource.RepresentationFactory;
 import de.niclashoyer.resteasytest.webid.WebIDInterceptor;
 import de.niclashoyer.resteasytest.webid.netty.WebIDNettyJaxrsServer;
 import java.io.FileNotFoundException;
@@ -11,7 +13,7 @@ import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
+import java.util.HashMap;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
@@ -30,12 +32,13 @@ public class App {
         ResteasyDeployment deployment = new ResteasyDeployment();
         deployment.setResourceClasses(Collections.singletonList(App.class.getName()));
         deployment.setProviderClasses(Collections.singletonList(WebIDInterceptor.class.getName()));
+        HashMap<Class, Object> context = new HashMap<>();
+        context.put(RepresentationFactory.class, new H2RepresentationFactory());
+        deployment.setDefaultContextObjects(context);
         final WebIDNettyJaxrsServer server = new WebIDNettyJaxrsServer();
         server.setDeployment(deployment);
-
         server.setKeyManagers(App.getKeyManager());
-
-        int port = 3000;
+        int port = 3210;
         server.setPort(port);
         server.start();
         System.out.println("Server listening on port " + port);
@@ -54,7 +57,8 @@ public class App {
     }
 
     @GET
-    public Response get(@Context HttpRequest req) {
+    public Response get(@Context HttpRequest req, @Context RepresentationFactory rf) {
+        System.out.println(rf);
         String str = "Hello World!\n";
         Object claims = req.getAttribute("webidclaims");
         if (claims != null) {
@@ -69,9 +73,10 @@ public class App {
         return Response.status(200).entity(str).type(MediaType.TEXT_PLAIN).build();
     }
 
+    /*
     @GET
     @Path("{any}")
     public Response catchAll(@Context HttpRequest req) {
         return this.get(req);
-    }
+    }*/
 }

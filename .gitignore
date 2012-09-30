@@ -16,6 +16,11 @@ target/
 *.war
 *.ear
 
+# Database Files
+*.h2.db
+*.traces.db
+/representations/
+
 # Temp Files
 *~
 *.swp

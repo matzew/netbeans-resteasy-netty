@@ -11,9 +11,9 @@ import org.jboss.resteasy.spi.Failure;
 import org.jboss.resteasy.spi.HttpRequest;
 import org.jboss.resteasy.spi.interception.PreProcessInterceptor;
 
- @Provider
- @ServerInterceptor
- @Precedence("SECURITY")
+@Provider
+@ServerInterceptor
+@Precedence("SECURITY")
 public class WebIDInterceptor implements PreProcessInterceptor {
 
     @Override
