@@ -15,8 +15,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.activation.MimeType;
-import javax.activation.MimeTypeParseException;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.ext.Provider;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.h2.jdbcx.JdbcDataSource;
@@ -63,19 +62,16 @@ public class H2RepresentationFactory implements RepresentationFactory {
     }
 
     @Override
-    public Collection<MimeType> getTypes(String path) {
+    public Collection<MediaType> getTypes(String path) {
         try {
             ResultSet rs;
-            MimeType mt;
-            ArrayList<MimeType> list = new ArrayList<>();
+            MediaType mt;
+            ArrayList<MediaType> list = new ArrayList<>();
             this.pathStatement.setString(1, path);
             rs = this.pathStatement.executeQuery();
             while (rs.next()) {
-                try {
-                    mt = new MimeType(rs.getString(1), rs.getString(2));
-                    list.add(mt);
-                } catch (MimeTypeParseException ex) {
-                }
+                mt = new MediaType(rs.getString(1), rs.getString(2));
+                list.add(mt);
             }
             return list;
         } catch (SQLException ex) {
@@ -84,23 +80,23 @@ public class H2RepresentationFactory implements RepresentationFactory {
     }
 
     @Override
-    public Representation readRepresentation(String path, MimeType type) {
+    public Representation readRepresentation(String path, MediaType type) {
         try {
             ResultSet rs;
-            if ("*".equals(type.getPrimaryType())) {
+            if (type.isWildcardType()) {
                 this.anyStatement.setString(1, path);
                 rs = this.anyStatement.executeQuery();
                 return this.toRepresentation(rs);
             }
-            if ("*".equals(type.getSubType())) {
+            if (type.isWildcardSubtype()) {
                 this.primarytypeStatement.setString(1, path);
-                this.primarytypeStatement.setString(2, type.getPrimaryType());
+                this.primarytypeStatement.setString(2, type.getType());
                 rs = this.primarytypeStatement.executeQuery();
                 return this.toRepresentation(rs);
             }
             this.singleStatement.setString(1, path);
-            this.singleStatement.setString(2, type.getPrimaryType());
-            this.singleStatement.setString(3, type.getSubType());
+            this.singleStatement.setString(2, type.getType());
+            this.singleStatement.setString(3, type.getSubtype());
             rs = this.singleStatement.executeQuery();
             return this.toRepresentation(rs);
         } catch (SQLException ex) {
@@ -110,9 +106,9 @@ public class H2RepresentationFactory implements RepresentationFactory {
     }
 
     @Override
-    public Representation writeRepresentation(String path, MimeType type) {
+    public Representation writeRepresentation(String path, MediaType type) {
         Representation rep;
-        if ("*".equals(type.getPrimaryType()) || "*".equals(type.getSubType())) {
+        if (type.isWildcardType() || type.isWildcardSubtype()) {
             return null;
         }
         rep = this.readRepresentation(path, type);
@@ -136,8 +132,8 @@ public class H2RepresentationFactory implements RepresentationFactory {
         return rep;
     }
 
-    protected Representation addNewRepresentation(String path, MimeType type) {
-        if ("*".equals(type.getPrimaryType()) || "*".equals(type.getSubType())) {
+    protected Representation addNewRepresentation(String path, MediaType type) {
+        if (type.isWildcardType() || type.isWildcardSubtype()) {
             return null;
         }
         try {
@@ -149,8 +145,8 @@ public class H2RepresentationFactory implements RepresentationFactory {
             this.insertStatement.setDate(2, now);
             this.insertStatement.setDate(3, now);
             this.insertStatement.setString(4, etag);
-            this.insertStatement.setString(5, type.getPrimaryType());
-            this.insertStatement.setString(6, type.getSubType());
+            this.insertStatement.setString(5, type.getType());
+            this.insertStatement.setString(6, type.getSubtype());
             this.insertStatement.setInt(7, 1);
             this.insertStatement.setString(8, file);
             this.insertStatement.executeUpdate();
@@ -158,7 +154,7 @@ public class H2RepresentationFactory implements RepresentationFactory {
             rep.setFileForStreams(new File(this.path + file));
             rep.setPath(path);
             rep.setETag(etag);
-            rep.setMimetype(type);
+            rep.setMediaType(type);
             rep.setCreated(nowDate);
             rep.setUpdated(nowDate);
             rep.setVersion(1);
@@ -169,8 +165,8 @@ public class H2RepresentationFactory implements RepresentationFactory {
         }
     }
 
-    protected String getFileName(String path, MimeType type) {
-        return DigestUtils.shaHex(path + type.getBaseType()) + ".bin";
+    protected String getFileName(String path, MediaType type) {
+        return DigestUtils.shaHex(path + type.getType() + '/' + type.getSubtype()) + ".bin";
     }
 
     protected String getRandomETag() {
@@ -185,7 +181,7 @@ public class H2RepresentationFactory implements RepresentationFactory {
                 File file = new File(this.path + name);
                 rep.setFileForStreams(file);
                 rep.setPath(path);
-                rep.setMimetype(new MimeType(rs.getString("primarytype"), rs.getString("subtype")));
+                rep.setMediaType(new MediaType(rs.getString("primarytype"), rs.getString("subtype")));
                 rep.setETag(rs.getString("etag"));
                 rep.setVersion(rs.getInt("version"));
                 rep.setCreated(rs.getDate("created"));
@@ -194,7 +190,7 @@ public class H2RepresentationFactory implements RepresentationFactory {
             } else {
                 return null;
             }
-        } catch (SQLException | MimeTypeParseException | FileNotFoundException ex) {
+        } catch (SQLException | FileNotFoundException ex) {
             Logger.getLogger(H2RepresentationFactory.class.getName()).log(Level.SEVERE, null, ex);
             return null;
         }

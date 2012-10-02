@@ -8,7 +8,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Date;
-import javax.activation.MimeType;
+import javax.ws.rs.core.MediaType;
 
 public class Representation {
     protected OutputStream outputStream;
@@ -18,7 +18,7 @@ public class Representation {
     protected int version;
     protected Date updated;
     protected Date created;
-    protected MimeType mimetype;
+    protected MediaType mediatype;
 
     public OutputStream getOutputStream() {
         return outputStream;
@@ -76,12 +76,12 @@ public class Representation {
         this.created = created;
     }
 
-    public MimeType getMimetype() {
-        return mimetype;
+    public MediaType getMediaType() {
+        return mediatype;
     }
 
-    public void setMimetype(MimeType mimetype) {
-        this.mimetype = mimetype;
+    public void setMediaType(MediaType mediatype) {
+        this.mediatype = mediatype;
     }
     
     public void setFileForStreams(File file) throws FileNotFoundException {

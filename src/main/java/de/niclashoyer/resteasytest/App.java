@@ -18,6 +18,7 @@ import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
 import javax.ws.rs.GET;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
@@ -27,6 +28,9 @@ import org.jboss.resteasy.spi.ResteasyDeployment;
 
 @Path("/")
 public class App {
+    
+    @Context
+    protected RepresentationFactory rf;
 
     public static void main(String[] args) throws Exception {
         ResteasyDeployment deployment = new ResteasyDeployment();
@@ -42,7 +46,6 @@ public class App {
         server.setPort(port);
         server.start();
         System.out.println("Server listening on port " + port);
-
     }
 
     protected static KeyManager[] getKeyManager() throws NoSuchAlgorithmException, FileNotFoundException, KeyStoreException, IOException, UnrecoverableKeyException, CertificateException {
@@ -57,7 +60,7 @@ public class App {
     }
 
     @GET
-    public Response get(@Context HttpRequest req, @Context RepresentationFactory rf) {
+    public Response get(@Context HttpRequest req) {
         System.out.println(rf);
         String str = "Hello World!\n";
         Object claims = req.getAttribute("webidclaims");
@@ -71,6 +74,12 @@ public class App {
             }
         }
         return Response.status(200).entity(str).type(MediaType.TEXT_PLAIN).build();
+    }
+    
+    @PUT
+    public Response put(@Context HttpRequest req) {
+        MediaType mediaType = req.getHttpHeaders().getMediaType();
+        return Response.status(201).build();
     }
 
     /*
