@@ -99,7 +99,7 @@ public class H2RepresentationFactory implements RepresentationFactory {
             this.singleStatement.setString(3, type.getSubtype());
             rs = this.singleStatement.executeQuery();
             return this.toRepresentation(rs);
-        } catch (SQLException ex) {
+        } catch (SQLException | NullPointerException ex) {
             Logger.getLogger(H2RepresentationFactory.class.getName()).log(Level.SEVERE, null, ex);
             return null;
         }
@@ -150,7 +150,7 @@ public class H2RepresentationFactory implements RepresentationFactory {
             this.insertStatement.setInt(7, 1);
             this.insertStatement.setString(8, file);
             this.insertStatement.executeUpdate();
-            Representation rep = new Representation();
+            FileRepresentation rep = new FileRepresentation();
             rep.setFileForStreams(new File(this.path + file));
             rep.setPath(path);
             rep.setETag(etag);
@@ -176,7 +176,7 @@ public class H2RepresentationFactory implements RepresentationFactory {
     protected Representation toRepresentation(ResultSet rs) {
         try {
             if (rs.next()) {
-                Representation rep = new Representation();
+                FileRepresentation rep = new FileRepresentation();
                 String name = rs.getString("file");
                 File file = new File(this.path + name);
                 rep.setFileForStreams(file);

@@ -84,9 +84,4 @@ public class Representation {
         this.mediatype = mediatype;
     }
     
-    public void setFileForStreams(File file) throws FileNotFoundException {
-        this.setOutputStream(new FileOutputStream(file));
-        this.setInputStream(new FileInputStream(file));
-    }
-    
 }

@@ -1,11 +1,13 @@
 package de.niclashoyer.resteasytest;
 
 import de.niclashoyer.resteasytest.resource.H2RepresentationFactory;
+import de.niclashoyer.resteasytest.resource.Representation;
 import de.niclashoyer.resteasytest.resource.RepresentationFactory;
 import de.niclashoyer.resteasytest.webid.WebIDInterceptor;
 import de.niclashoyer.resteasytest.webid.netty.WebIDNettyJaxrsServer;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -18,11 +20,15 @@ import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
 import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.ResponseBuilder;
+import org.apache.commons.io.IOUtils;
 import org.jboss.resteasy.spi.HttpRequest;
 import org.jboss.resteasy.spi.ResteasyDeployment;
 
@@ -76,9 +82,25 @@ public class App {
         return Response.status(200).entity(str).type(MediaType.TEXT_PLAIN).build();
     }
     
+    @GET
+    @Path("{path:.*}")
+    public Response getAll(@PathParam("path") String path, InputStream body) throws IOException {
+        ResponseBuilder resp;
+        resp = Response.status(Response.Status.CREATED);
+        path = "/" + path;
+        System.out.println(rf.getTypes(path));
+        Representation rep = rf.readRepresentation(path, MediaType.WILDCARD_TYPE);
+        resp.type(rep.getMediaType());
+        resp.entity(rep.getInputStream());
+        return resp.build();
+    }
+    
     @PUT
-    public Response put(@Context HttpRequest req) {
-        MediaType mediaType = req.getHttpHeaders().getMediaType();
+    @Path("{path:.*}")
+    public Response putAll(@HeaderParam("Content-Type") MediaType type, @PathParam("path") String path, InputStream body) throws IOException {
+        path = "/" + path;
+        Representation rep = rf.writeRepresentation(path, type);
+        IOUtils.copy(body, rep.getOutputStream());
         return Response.status(201).build();
     }
 
