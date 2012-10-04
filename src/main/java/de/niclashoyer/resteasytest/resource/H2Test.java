@@ -1,12 +1,15 @@
 
 package de.niclashoyer.resteasytest.resource;
 
+import com.sun.xml.internal.bind.v2.schemagen.xmlschema.LocalElement;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Locale;
 import javax.activation.MimeTypeParseException;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Variant;
 import org.apache.commons.io.IOUtils;
 
 public class H2Test {

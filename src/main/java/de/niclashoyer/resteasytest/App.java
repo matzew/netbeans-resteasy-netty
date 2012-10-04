@@ -26,6 +26,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import org.apache.commons.io.IOUtils;
@@ -84,7 +85,7 @@ public class App {
     
     @GET
     @Path("{path:.*}")
-    public Response getAll(@PathParam("path") String path, InputStream body) throws IOException {
+    public Response getAll(@PathParam("path") String path, InputStream body, @Context Request req) throws IOException {
         ResponseBuilder resp;
         resp = Response.status(Response.Status.CREATED);
         path = "/" + path;
@@ -93,6 +94,7 @@ public class App {
         resp.type(rep.getMediaType());
         resp.entity(rep.getInputStream());
         return resp.build();
+        
     }
     
     @PUT
@@ -104,10 +106,4 @@ public class App {
         return Response.status(201).build();
     }
 
-    /*
-    @GET
-    @Path("{any}")
-    public Response catchAll(@Context HttpRequest req) {
-        return this.get(req);
-    }*/
 }
