@@ -8,6 +8,7 @@ import de.niclashoyer.resteasytest.webid.netty.WebIDNettyJaxrsServer;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.math.BigInteger;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -29,11 +30,14 @@ import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
+import javax.ws.rs.core.StreamingOutput;
 import javax.ws.rs.core.UriInfo;
 import javax.ws.rs.core.Variant;
 import org.apache.commons.io.IOUtils;
@@ -88,6 +92,21 @@ public class App {
             }
         }
         return Response.status(200).entity(str).type(MediaType.TEXT_PLAIN).build();
+    }
+
+    @GET
+    @Path("/foobar")
+    public Response foobar() {
+        StreamingOutput so;
+        so = new StreamingOutput() {
+            @Override
+            public void write(OutputStream out) throws IOException, WebApplicationException {
+                byte[] bytes = {42, 42, 42, 42};
+                out.write(bytes);
+                out.close();
+            }
+        };
+        return Response.ok().type(MediaType.TEXT_PLAIN).tag(new EntityTag("foobar")).entity(so).build();
     }
 
     @GET
