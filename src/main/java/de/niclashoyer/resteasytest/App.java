@@ -76,7 +76,6 @@ public class App {
 
     @GET
     public Response get(@Context HttpRequest req) {
-        System.out.println(rf);
         String str = "Hello World!\n";
         Object claims = req.getAttribute("webidclaims");
         if (claims != null) {
@@ -105,7 +104,10 @@ public class App {
             return resp.build();
         }
         selected = req.selectVariant(variants);
-        System.out.println(selected);
+        if (selected == null) {
+            resp = Response.notAcceptable(variants);
+            return resp.build();
+        }
         rep = rf.selectRepresentation(path, selected);
         resp = req.evaluatePreconditions(rep.getLastModified(), rep.getEntityTag());
         if (resp != null) {
@@ -113,21 +115,32 @@ public class App {
         } else {
             resp = Response.ok(rep.getInputStream(), selected);
             resp.tag(rep.getEntityTag());
+            resp.lastModified(rep.getLastModified());
+            resp.variants(variants);
             return resp.build();
         }
     }
 
     @PUT
     @Path("{path:.*}")
-    public Response putAll(@Context Request req, @PathParam("path") String path, InputStream body) throws IOException {
+    public Response putAll(@Context Request req, @HeaderParam("Content-Type") MediaType type, @HeaderParam("Content-Language") Locale loc, @PathParam("path") String path, InputStream body) throws IOException {
         ResponseBuilder resp;
-        Variant selected;
+        Variant variant;
+        List<Variant> variants;
         Representation rep;
         path = "/" + path;
-        selected = req.selectVariant(rf.getVariants(path));
-        rep = rf.selectRepresentation(path, selected);
+        variant = new Variant(type, loc, "deflate");
+        rep = rf.selectRepresentation(path, variant);
         if (rep == null) {
-            resp = Response.noContent().status(Response.Status.CONFLICT);
+            variants = rf.getVariants(path);
+            if (variants.isEmpty()) {
+                resp = Response.noContent().status(Response.Status.CONFLICT);
+            } else {
+                rep = rf.createRepresentation(path, variant);
+                IOUtils.copy(body, rep.getOutputStream());
+                resp = Response.noContent().status(Response.Status.OK);
+                resp.tag(rep.getEntityTag());
+            }
         } else {
             resp = req.evaluatePreconditions(rep.getLastModified(), rep.getEntityTag());
             if (resp == null) {
@@ -150,6 +163,7 @@ public class App {
         }
         variant = new Variant(type, loc, "deflate");
         rep = rf.createRepresentation(path, variant);
+        IOUtils.copy(body, rep.getOutputStream());
         resp = Response.noContent().status(Response.Status.CREATED);
         resp.tag(rep.getEntityTag());
         resp.location(uri.getAbsolutePathBuilder().path(path).build());

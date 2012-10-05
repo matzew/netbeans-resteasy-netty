@@ -32,6 +32,7 @@ public class FileRepresentation implements Representation {
     @Override
     public OutputStream getOutputStream() {
         try {
+            System.out.println(this.file);
             return new FileOutputStream(this.file);
         } catch (FileNotFoundException ex) {
             Logger.getLogger(FileRepresentation.class.getName()).log(Level.SEVERE, null, ex);

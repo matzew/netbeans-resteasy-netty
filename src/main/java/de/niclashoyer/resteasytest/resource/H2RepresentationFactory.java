@@ -43,6 +43,7 @@ public class H2RepresentationFactory implements RepresentationFactory {
     protected PreparedStatement etagStatement;
     protected PreparedStatement insertStatement;
     protected PreparedStatement singleStatement;
+    protected PreparedStatement langUndefStatement;
     protected PreparedStatement ETagUpdateStatement;
     protected PreparedStatement anyStatement;
     private final String path = "representations/";
@@ -75,7 +76,7 @@ public class H2RepresentationFactory implements RepresentationFactory {
             java.util.Date nowDate = new java.util.Date();
             Date now = new Date(nowDate.getTime());
             String etag = this.getRandomETag();
-            String file = this.getFileName(path, type);
+            String file = this.getFileName(path, v, 1);
             this.insertStatement.setString(1, path);
             this.insertStatement.setDate(2, now);
             this.insertStatement.setDate(3, now);
@@ -86,7 +87,7 @@ public class H2RepresentationFactory implements RepresentationFactory {
             this.insertStatement.setInt(8, 1);
             this.insertStatement.setString(9, file);
             this.insertStatement.executeUpdate();
-            File handle = new File(file);
+            File handle = new File(this.path+file);
             return new FileRepresentation(
                     handle,
                     nowDate,
@@ -99,8 +100,15 @@ public class H2RepresentationFactory implements RepresentationFactory {
         }
     }
 
-    protected String getFileName(String path, MediaType type) {
-        return DigestUtils.shaHex(path + type.getType() + '/' + type.getSubtype()) + ".bin";
+    protected String getFileName(String path, Variant variant, int version) {
+        MediaType type = variant.getMediaType();
+        Locale loc = variant.getLanguage();
+        return DigestUtils.shaHex(
+                path +
+                type.getType() + '/' + type.getSubtype() +
+                loc.toLanguageTag() +
+                version
+                ) + ".bin";
     }
 
     protected String getRandomETag() {
@@ -129,6 +137,13 @@ public class H2RepresentationFactory implements RepresentationFactory {
                 + "AND primarytype = ? "
                 + "AND subtype = ? "
                 + "AND language = ? "
+                + "LIMIT 1");
+        this.langUndefStatement = this.conn.prepareStatement(
+                "SELECT * "
+                + "FROM " + table + " "
+                + "WHERE path = ? "
+                + "AND primarytype = ? "
+                + "AND subtype = ? "
                 + "LIMIT 1");
         this.anyStatement = this.conn.prepareStatement(
                 "SELECT * "
@@ -174,40 +189,49 @@ public class H2RepresentationFactory implements RepresentationFactory {
 
     @Override
     public Representation selectRepresentation(String path, Variant v) {
-        MediaType type;
-        Locale loc;
-        File file;
-        type = v.getMediaType();
-        loc = v.getLanguage();
-        if (type.isWildcardType() || type.isWildcardSubtype()) {
-            return null;
-        }
-        ResultSet rs = this.readRepresentation(path, type, loc);
-        if (rs == null) {
-            return null;
-        } else {
-            try {
-                file = new File(rs.getString("file"));
+        try {
+            MediaType type;
+            Locale loc;
+            File file;
+            type = v.getMediaType();
+            loc = v.getLanguage();
+            if (type == null || type.isWildcardType() || type.isWildcardSubtype()) {
+                return null;
+            }
+            ResultSet rs = this.readRepresentation(path, type, loc);
+            System.out.println(rs);
+            if (rs == null || !rs.next()) {
+                return null;
+            } else {
+                file = new File(this.path+rs.getString("file"));
                 return new FileRepresentation(
                         file,
-                        rs.getDate("modified"),
+                        rs.getDate("updated"),
                         rs.getDate("created"),
                         v,
                         new EntityTag(rs.getString("etag")));
-            } catch (SQLException ex) {
-                Logger.getLogger(H2RepresentationFactory.class.getName()).log(Level.SEVERE, null, ex);
-                return null;
             }
+        } catch (SQLException ex) {
+            Logger.getLogger(H2RepresentationFactory.class.getName()).log(Level.SEVERE, null, ex);
+            return null;
         }
     }
-    
+
     protected ResultSet readRepresentation(String path, MediaType type, Locale loc) {
         try {
-            this.singleStatement.setString(1, path);
-            this.singleStatement.setString(2, type.getType());
-            this.singleStatement.setString(3, type.getSubtype());
-            this.singleStatement.setString(4, loc.toLanguageTag());
-            return this.singleStatement.executeQuery();
+            String lang = loc.toLanguageTag();
+            if (lang.equals("und")) {
+                this.langUndefStatement.setString(1, path);
+                this.langUndefStatement.setString(2, type.getType());
+                this.langUndefStatement.setString(3, type.getSubtype());
+                return this.langUndefStatement.executeQuery();
+            } else {
+                this.singleStatement.setString(1, path);
+                this.singleStatement.setString(2, type.getType());
+                this.singleStatement.setString(3, type.getSubtype());
+                this.singleStatement.setString(4, loc.toLanguageTag());
+                return this.singleStatement.executeQuery();
+            }
         } catch (SQLException | NullPointerException ex) {
             Logger.getLogger(H2RepresentationFactory.class.getName()).log(Level.SEVERE, null, ex);
             return null;
