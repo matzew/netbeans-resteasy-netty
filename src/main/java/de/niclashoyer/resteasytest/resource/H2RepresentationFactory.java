@@ -1,7 +1,6 @@
 package de.niclashoyer.resteasytest.resource;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.math.BigInteger;
 import java.security.SecureRandom;
 import java.sql.Connection;
@@ -10,12 +9,15 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Variant;
+import javax.ws.rs.core.Variant.VariantListBuilder;
 import javax.ws.rs.ext.Provider;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.h2.jdbcx.JdbcDataSource;
@@ -33,13 +35,12 @@ public class H2RepresentationFactory implements RepresentationFactory {
             + "etag varchar(128),"
             + "primarytype varchar(20),"
             + "subtype varchar(20),"
+            + "language varchar(10),"
             + "version int,"
             + "file varchar(255)"
             + ")";
     protected PreparedStatement pathStatement;
     protected PreparedStatement etagStatement;
-    protected PreparedStatement primarytypeStatement;
-    protected PreparedStatement basetypeStatement;
     protected PreparedStatement insertStatement;
     protected PreparedStatement singleStatement;
     protected PreparedStatement ETagUpdateStatement;
@@ -62,77 +63,11 @@ public class H2RepresentationFactory implements RepresentationFactory {
     }
 
     @Override
-    public Collection<MediaType> getTypes(String path) {
-        try {
-            ResultSet rs;
-            MediaType mt;
-            ArrayList<MediaType> list = new ArrayList<>();
-            this.pathStatement.setString(1, path);
-            rs = this.pathStatement.executeQuery();
-            while (rs.next()) {
-                mt = new MediaType(rs.getString(1), rs.getString(2));
-                list.add(mt);
-            }
-            return list;
-        } catch (SQLException ex) {
-            return Collections.EMPTY_LIST;
-        }
-    }
-
-    @Override
-    public Representation readRepresentation(String path, MediaType type) {
-        try {
-            ResultSet rs;
-            if (type.isWildcardType()) {
-                this.anyStatement.setString(1, path);
-                rs = this.anyStatement.executeQuery();
-                return this.toRepresentation(rs);
-            }
-            if (type.isWildcardSubtype()) {
-                this.primarytypeStatement.setString(1, path);
-                this.primarytypeStatement.setString(2, type.getType());
-                rs = this.primarytypeStatement.executeQuery();
-                return this.toRepresentation(rs);
-            }
-            this.singleStatement.setString(1, path);
-            this.singleStatement.setString(2, type.getType());
-            this.singleStatement.setString(3, type.getSubtype());
-            rs = this.singleStatement.executeQuery();
-            return this.toRepresentation(rs);
-        } catch (SQLException | NullPointerException ex) {
-            Logger.getLogger(H2RepresentationFactory.class.getName()).log(Level.SEVERE, null, ex);
-            return null;
-        }
-    }
-
-    @Override
-    public Representation writeRepresentation(String path, MediaType type) {
-        Representation rep;
-        if (type.isWildcardType() || type.isWildcardSubtype()) {
-            return null;
-        }
-        rep = this.readRepresentation(path, type);
-        if (rep == null) {
-            rep = this.addNewRepresentation(path, type);
-        } else {
-            try {
-                String oldETag = rep.getETag();
-                String newETag = this.getRandomETag();
-                this.ETagUpdateStatement.setString(1, newETag);
-                this.ETagUpdateStatement.setString(2, oldETag);
-                this.ETagUpdateStatement.executeUpdate();
-                rep.setETag(newETag);
-                return rep;
-            } catch (SQLException ex) {
-                Logger.getLogger(H2RepresentationFactory.class.getName()).log(Level.SEVERE, null, ex);
-                return null;
-            }
-        }
-
-        return rep;
-    }
-
-    protected Representation addNewRepresentation(String path, MediaType type) {
+    public Representation createRepresentation(String path, Variant v) {
+        MediaType type;
+        Locale loc;
+        type = v.getMediaType();
+        loc = v.getLanguage();
         if (type.isWildcardType() || type.isWildcardSubtype()) {
             return null;
         }
@@ -147,19 +82,18 @@ public class H2RepresentationFactory implements RepresentationFactory {
             this.insertStatement.setString(4, etag);
             this.insertStatement.setString(5, type.getType());
             this.insertStatement.setString(6, type.getSubtype());
-            this.insertStatement.setInt(7, 1);
-            this.insertStatement.setString(8, file);
+            this.insertStatement.setString(7, loc.toLanguageTag());
+            this.insertStatement.setInt(8, 1);
+            this.insertStatement.setString(9, file);
             this.insertStatement.executeUpdate();
-            FileRepresentation rep = new FileRepresentation();
-            rep.setFileForStreams(new File(this.path + file));
-            rep.setPath(path);
-            rep.setETag(etag);
-            rep.setMediaType(type);
-            rep.setCreated(nowDate);
-            rep.setUpdated(nowDate);
-            rep.setVersion(1);
-            return rep;
-        } catch (FileNotFoundException | SQLException ex) {
+            File handle = new File(file);
+            return new FileRepresentation(
+                    handle,
+                    nowDate,
+                    nowDate,
+                    v,
+                    new EntityTag(etag));
+        } catch (SQLException ex) {
             Logger.getLogger(H2RepresentationFactory.class.getName()).log(Level.SEVERE, null, ex);
             return null;
         }
@@ -173,32 +107,9 @@ public class H2RepresentationFactory implements RepresentationFactory {
         return new BigInteger(130, random).toString(32).substring(0, 15);
     }
 
-    protected Representation toRepresentation(ResultSet rs) {
-        try {
-            if (rs.next()) {
-                FileRepresentation rep = new FileRepresentation();
-                String name = rs.getString("file");
-                File file = new File(this.path + name);
-                rep.setFileForStreams(file);
-                rep.setPath(path);
-                rep.setMediaType(new MediaType(rs.getString("primarytype"), rs.getString("subtype")));
-                rep.setETag(rs.getString("etag"));
-                rep.setVersion(rs.getInt("version"));
-                rep.setCreated(rs.getDate("created"));
-                rep.setUpdated(rs.getDate("updated"));
-                return rep;
-            } else {
-                return null;
-            }
-        } catch (SQLException | FileNotFoundException ex) {
-            Logger.getLogger(H2RepresentationFactory.class.getName()).log(Level.SEVERE, null, ex);
-            return null;
-        }
-    }
-
     private void prepareStatements() throws SQLException {
         this.pathStatement = this.conn.prepareStatement(
-                "SELECT DISTINCT primarytype, subtype "
+                "SELECT DISTINCT primarytype, subtype, language "
                 + "FROM " + table + " "
                 + "WHERE path = ?");
         this.etagStatement = this.conn.prepareStatement(
@@ -206,22 +117,10 @@ public class H2RepresentationFactory implements RepresentationFactory {
                 + "FROM " + table + " "
                 + "WHERE etag = ? "
                 + "LIMIT 1");
-        this.primarytypeStatement = this.conn.prepareStatement(
-                "SELECT * "
-                + "FROM " + table + " "
-                + "WHERE path = ? "
-                + "AND primarytype = ? "
-                + "LIMIT 1");
-        this.basetypeStatement = this.conn.prepareStatement(
-                "SELECT * "
-                + "FROM " + table + " "
-                + "WHERE path = ? "
-                + "AND primarytype = ? "
-                + "AND subtype = ?");
         this.insertStatement = this.conn.prepareStatement(
                 "INSERT "
                 + "INTO " + table + " VALUES ("
-                + "?, ?, ?, ?, ?, ?, ?, ?"
+                + "?, ?, ?, ?, ?, ?, ?, ?, ?"
                 + ")");
         this.singleStatement = this.conn.prepareStatement(
                 "SELECT * "
@@ -229,6 +128,7 @@ public class H2RepresentationFactory implements RepresentationFactory {
                 + "WHERE path = ? "
                 + "AND primarytype = ? "
                 + "AND subtype = ? "
+                + "AND language = ? "
                 + "LIMIT 1");
         this.anyStatement = this.conn.prepareStatement(
                 "SELECT * "
@@ -239,5 +139,78 @@ public class H2RepresentationFactory implements RepresentationFactory {
                 "UPDATE " + table + " "
                 + "SET etag = ? "
                 + "WHERE etag = ?");
+    }
+
+    @Override
+    public List<Variant> getVariants(String path) {
+        try {
+            boolean hasResults;
+            ResultSet rs;
+            MediaType mt;
+            Locale loc;
+            String[] encodings = {"gzip", "deflate"};
+            VariantListBuilder list = Variant.encodings(encodings);
+            this.pathStatement.setString(1, path);
+            rs = this.pathStatement.executeQuery();
+            hasResults = false;
+            while (rs.next()) {
+                hasResults = true;
+                mt = new MediaType(rs.getString(1), rs.getString(2));
+                loc = new Locale(rs.getString(3));
+                list.encodings(encodings);
+                list.mediaTypes(mt);
+                list.languages(loc);
+                list.add();
+            }
+            if (hasResults) {
+                return list.build();
+            } else {
+                return Collections.EMPTY_LIST;
+            }
+        } catch (SQLException ex) {
+            return Collections.EMPTY_LIST;
+        }
+    }
+
+    @Override
+    public Representation selectRepresentation(String path, Variant v) {
+        MediaType type;
+        Locale loc;
+        File file;
+        type = v.getMediaType();
+        loc = v.getLanguage();
+        if (type.isWildcardType() || type.isWildcardSubtype()) {
+            return null;
+        }
+        ResultSet rs = this.readRepresentation(path, type, loc);
+        if (rs == null) {
+            return null;
+        } else {
+            try {
+                file = new File(rs.getString("file"));
+                return new FileRepresentation(
+                        file,
+                        rs.getDate("modified"),
+                        rs.getDate("created"),
+                        v,
+                        new EntityTag(rs.getString("etag")));
+            } catch (SQLException ex) {
+                Logger.getLogger(H2RepresentationFactory.class.getName()).log(Level.SEVERE, null, ex);
+                return null;
+            }
+        }
+    }
+    
+    protected ResultSet readRepresentation(String path, MediaType type, Locale loc) {
+        try {
+            this.singleStatement.setString(1, path);
+            this.singleStatement.setString(2, type.getType());
+            this.singleStatement.setString(3, type.getSubtype());
+            this.singleStatement.setString(4, loc.toLanguageTag());
+            return this.singleStatement.executeQuery();
+        } catch (SQLException | NullPointerException ex) {
+            Logger.getLogger(H2RepresentationFactory.class.getName()).log(Level.SEVERE, null, ex);
+            return null;
+        }
     }
 }

@@ -8,19 +8,24 @@ import de.niclashoyer.resteasytest.webid.netty.WebIDNettyJaxrsServer;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
 import javax.ws.rs.GET;
 import javax.ws.rs.HeaderParam;
+import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -29,15 +34,18 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
+import javax.ws.rs.core.UriInfo;
+import javax.ws.rs.core.Variant;
 import org.apache.commons.io.IOUtils;
 import org.jboss.resteasy.spi.HttpRequest;
 import org.jboss.resteasy.spi.ResteasyDeployment;
 
 @Path("/")
 public class App {
-    
+
     @Context
     protected RepresentationFactory rf;
+    protected SecureRandom random = new SecureRandom();
 
     public static void main(String[] args) throws Exception {
         ResteasyDeployment deployment = new ResteasyDeployment();
@@ -60,9 +68,9 @@ public class App {
         KeyStore tmpKS = null;
         tmFactory.init(tmpKS);
         KeyStore ks = KeyStore.getInstance("JKS");
-        ks.load(App.class.getClassLoader().getResourceAsStream("cert.jks"),"secret".toCharArray());
+        ks.load(App.class.getClassLoader().getResourceAsStream("cert.jks"), "secret".toCharArray());
         KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-        kmf.init(ks,"secret".toCharArray());
+        kmf.init(ks, "secret".toCharArray());
         return kmf.getKeyManagers();
     }
 
@@ -76,34 +84,75 @@ public class App {
             str += "You claimed the following WebIDs:\n";
             int i = 1;
             for (String uri : uris) {
-                str += i+". "+uri+"\n";
+                str += i + ". " + uri + "\n";
                 i++;
             }
         }
         return Response.status(200).entity(str).type(MediaType.TEXT_PLAIN).build();
     }
-    
+
     @GET
     @Path("{path:.*}")
     public Response getAll(@PathParam("path") String path, InputStream body, @Context Request req) throws IOException {
         ResponseBuilder resp;
-        resp = Response.status(Response.Status.CREATED);
+        Variant selected;
+        List<Variant> variants;
+        Representation rep;
         path = "/" + path;
-        System.out.println(rf.getTypes(path));
-        Representation rep = rf.readRepresentation(path, MediaType.WILDCARD_TYPE);
-        resp.type(rep.getMediaType());
-        resp.entity(rep.getInputStream());
-        return resp.build();
-        
-    }
-    
-    @PUT
-    @Path("{path:.*}")
-    public Response putAll(@HeaderParam("Content-Type") MediaType type, @PathParam("path") String path, InputStream body) throws IOException {
-        path = "/" + path;
-        Representation rep = rf.writeRepresentation(path, type);
-        IOUtils.copy(body, rep.getOutputStream());
-        return Response.status(201).build();
+        variants = rf.getVariants(path);
+        if (variants.isEmpty()) {
+            resp = Response.status(Response.Status.NOT_FOUND);
+            return resp.build();
+        }
+        selected = req.selectVariant(variants);
+        System.out.println(selected);
+        rep = rf.selectRepresentation(path, selected);
+        resp = req.evaluatePreconditions(rep.getLastModified(), rep.getEntityTag());
+        if (resp != null) {
+            return resp.build();
+        } else {
+            resp = Response.ok(rep.getInputStream(), selected);
+            resp.tag(rep.getEntityTag());
+            return resp.build();
+        }
     }
 
+    @PUT
+    @Path("{path:.*}")
+    public Response putAll(@Context Request req, @PathParam("path") String path, InputStream body) throws IOException {
+        ResponseBuilder resp;
+        Variant selected;
+        Representation rep;
+        path = "/" + path;
+        selected = req.selectVariant(rf.getVariants(path));
+        rep = rf.selectRepresentation(path, selected);
+        if (rep == null) {
+            resp = Response.noContent().status(Response.Status.CONFLICT);
+        } else {
+            resp = req.evaluatePreconditions(rep.getLastModified(), rep.getEntityTag());
+            if (resp == null) {
+                IOUtils.copy(body, rep.getOutputStream());
+                resp = Response.noContent().status(Response.Status.OK);
+                resp.tag(rep.getEntityTag());
+            }
+        }
+        return resp.build();
+    }
+
+    @POST
+    public Response postAll(@HeaderParam("Content-Type") MediaType type, @HeaderParam("Content-Language") Locale loc, @Context UriInfo uri, InputStream body) throws IOException {
+        ResponseBuilder resp;
+        Variant variant;
+        Representation rep;
+        String path = "/" + new BigInteger(130, random).toString(32).substring(0, 20);
+        if (loc == null) {
+            loc = Locale.ROOT;
+        }
+        variant = new Variant(type, loc, "deflate");
+        rep = rf.createRepresentation(path, variant);
+        resp = Response.noContent().status(Response.Status.CREATED);
+        resp.tag(rep.getEntityTag());
+        resp.location(uri.getAbsolutePathBuilder().path(path).build());
+        return resp.build();
+    }
 }
