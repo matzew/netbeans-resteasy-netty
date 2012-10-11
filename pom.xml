@@ -53,5 +53,10 @@
       <artifactId>commons-io</artifactId>
       <version>2.4</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.jena</groupId>
+      <artifactId>jena-arq</artifactId>
+      <version>2.9.3</version>
+    </dependency>
   </dependencies>
 </project>

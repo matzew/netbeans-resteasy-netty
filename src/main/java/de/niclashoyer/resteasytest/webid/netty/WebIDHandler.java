@@ -77,6 +77,7 @@ public class WebIDHandler implements ChannelUpstreamHandler {
             if (cert != null) {
                 Collection<String> uris = getClaimedURIs(cert);
                 req.setAttribute("webidclaims", uris);
+                req.setAttribute("webidcertificate", cert);
             }
         }
         ctx.sendUpstream(evt);

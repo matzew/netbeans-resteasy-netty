@@ -1,5 +1,7 @@
 package de.niclashoyer.resteasytest;
 
+import de.niclashoyer.resteasytest.rdf.MemoryStoreFactory;
+import de.niclashoyer.resteasytest.rdf.StoreFactory;
 import de.niclashoyer.resteasytest.resource.H2RepresentationFactory;
 import de.niclashoyer.resteasytest.resource.Representation;
 import de.niclashoyer.resteasytest.resource.RepresentationFactory;
@@ -49,6 +51,7 @@ public class App {
 
     @Context
     protected RepresentationFactory rf;
+    protected StoreFactory sf;
     protected SecureRandom random = new SecureRandom();
 
     public static void main(String[] args) throws Exception {
@@ -57,6 +60,7 @@ public class App {
         deployment.setProviderClasses(Collections.singletonList(WebIDInterceptor.class.getName()));
         HashMap<Class, Object> context = new HashMap<>();
         context.put(RepresentationFactory.class, new H2RepresentationFactory());
+        context.put(StoreFactory.class, new MemoryStoreFactory());
         deployment.setDefaultContextObjects(context);
         final WebIDNettyJaxrsServer server = new WebIDNettyJaxrsServer();
         server.setDeployment(deployment);
@@ -82,11 +86,19 @@ public class App {
     public Response get(@Context HttpRequest req) {
         String str = "Hello World!\n";
         Object claims = req.getAttribute("webidclaims");
+        Object webids = req.getAttribute("webids");
         if (claims != null) {
             Collection<String> uris = (Collection<String>) claims;
+            Collection<String> ids  = (Collection<String>) webids;
             str += "You claimed the following WebIDs:\n";
             int i = 1;
             for (String uri : uris) {
+                str += i + ". " + uri + "\n";
+                i++;
+            }
+            str += "And the following WebIDs could be verified:\n";
+            i = 1;
+            for (String uri : ids) {
                 str += i + ". " + uri + "\n";
                 i++;
             }
