@@ -8,6 +8,7 @@ import com.hp.hpl.jena.query.QueryExecutionFactory;
 import com.hp.hpl.jena.query.ResultSetFormatter;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.sparql.core.DatasetGraph;
+import com.hp.hpl.jena.tdb.TDBFactory;
 import com.hp.hpl.jena.update.GraphStore;
 import com.hp.hpl.jena.util.FileManager;
 import java.math.BigInteger;
@@ -35,15 +36,12 @@ public class WebIDInterceptor implements PreProcessInterceptor {
     protected Dataset session;
     
     public WebIDInterceptor() {
-        this(DatasetFactory.createMem());
-    }
-    
-    public WebIDInterceptor(Dataset session) {
-        this.session = session;
+        System.out.println("interceptor");
     }
 
     @Override
     public ServerResponse preProcess(HttpRequest req, ResourceMethod m) throws Failure, WebApplicationException {
+        session = TDBFactory.createDataset("session");
         Model webid;
         RSAPublicKey rsa;
         PublicKey key;
